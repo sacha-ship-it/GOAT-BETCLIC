@@ -16,11 +16,7 @@ const {
   escapeMarkdown,
 } = require('discord.js');
 
-const {
-  randomUUID,
-  createHash,
-} = require('node:crypto');
-
+const { randomUUID, createHash } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
@@ -30,9 +26,7 @@ const RED = /^#[a-f\d]{6}$/i.test(process.env.GOAT_COLOR || '')
   ? process.env.GOAT_COLOR
   : '#E31B23';
 
-const id = () => randomUUID()
-  .replaceAll('-', '')
-  .slice(0, 16);
+const id = () => randomUUID().replaceAll('-', '').slice(0, 16);
 
 class UserError extends Error {}
 
@@ -123,17 +117,14 @@ function weekKey(value) {
   const date = dateKey(value);
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
 
-  return shiftDate(
-    date,
-    -(weekday === 0 ? 6 : weekday - 1)
-  );
+  return shiftDate(date, -(weekday === 0 ? 6 : weekday - 1));
 }
 
 function parseTime(value) {
   let text = value.trim();
 
   // Format conseillé : 07:00 2026-10-20.
-  // L'ancien format 2026-10-20 07:00 reste accepté.
+  // Le format 2026-10-20 07:00 reste accepté.
   if (/^\d{2}:\d{2} \d{4}-\d{2}-\d{2}$/.test(text)) {
     text = text.slice(6) + ' ' + text.slice(0, 5);
   }
@@ -142,11 +133,7 @@ function parseTime(value) {
     dateKey(text.slice(0, 10));
 
     const ms = Date.parse(text);
-
-    need(
-      Number.isFinite(ms),
-      'Date/heure ISO invalide.'
-    );
+    need(Number.isFinite(ms), 'Date/heure ISO invalide.');
 
     return ms;
   }
@@ -158,18 +145,12 @@ function parseTime(value) {
 
   dateKey(text.slice(0, 10));
 
-  const utc = Date.parse(
-    text.replace(' ', 'T') + ':00Z'
-  );
-
+  const utc = Date.parse(text.replace(' ', 'T') + ':00Z');
   const candidates = [];
 
   for (let offset = -180; offset <= 180; offset += 30) {
     const ms = utc + offset * 60000;
-
-    if (parisInput(ms) === text) {
-      candidates.push(ms);
-    }
+    if (parisInput(ms) === text) candidates.push(ms);
   }
 
   need(
@@ -187,7 +168,6 @@ function parseTime(value) {
 
 function imageURL(value) {
   const url = value?.trim() || '';
-
   if (!url) return '';
 
   let parsed;
@@ -205,11 +185,7 @@ function imageURL(value) {
     'Utilise un lien image HTTPS public.'
   );
 
-  need(
-    url.length <= 1000,
-    'Lien image trop long.'
-  );
-
+  need(url.length <= 1000, 'Lien image trop long.');
   return url;
 }
 
@@ -250,7 +226,7 @@ function initialState() {
   };
 }
 
-// Préserve les données de la version précédente.
+// Préserve les données de la première version.
 function migrate(old) {
   if (
     old.schema === 2 &&
@@ -282,7 +258,7 @@ function migrate(old) {
     for (const [index, x] of d.matches.entries()) {
       s.matches[x.id] = {
         id: x.id,
-        title: `${x.home} / ${x.away}`,
+        title: `${x.home} VS ${x.away}`,
         home: x.home,
         away: x.away,
         homeOdds: x.homeOdds,
@@ -290,16 +266,12 @@ function migrate(old) {
         date: d.date,
         publishAt: d.publishAt,
         closeAt: x.lockAt,
-        channelId:
-          d.post?.channelId ||
-          old.config.channelId,
+        channelId: d.post?.channelId || old.config.channelId,
         description: d.description || '',
         image: x.image || d.image || '',
         imageFile: '',
         roleId: null,
-        status: d.status === 'draft'
-          ? 'draft'
-          : d.status,
+        status: d.status === 'draft' ? 'draft' : d.status,
         result: x.result,
         revision: x.revision,
         version: 1,
@@ -333,19 +305,13 @@ function migrate(old) {
 class Store {
   constructor(directory) {
     this.directory = directory;
-    this.filename = path.join(
-      directory,
-      'goat-data.json'
-    );
-
+    this.filename = path.join(directory, 'goat-data.json');
     this.queue = Promise.resolve();
     this.state = null;
   }
 
   async init() {
-    await fs.mkdir(this.directory, {
-      recursive: true,
-    });
+    await fs.mkdir(this.directory, { recursive: true });
 
     try {
       const data = JSON.parse(
@@ -354,7 +320,7 @@ class Store {
 
       this.state = migrate(data);
     } catch (e) {
-      // Ne jamais écraser une sauvegarde illisible.
+      // Ne pas remplacer une sauvegarde illisible.
       if (e.code !== 'ENOENT') throw e;
 
       this.state = initialState();
@@ -364,12 +330,7 @@ class Store {
 
   async write(data) {
     const temp = this.filename + '.tmp';
-
-    const handle = await fs.open(
-      temp,
-      'w',
-      0o600
-    );
+    const handle = await fs.open(temp, 'w', 0o600);
 
     try {
       await handle.writeFile(JSON.stringify(data));
@@ -389,17 +350,12 @@ class Store {
 
     await fs.rename(temp, this.filename);
 
-    const directory = await fs.open(
-      this.directory,
-      'r'
-    );
+    const directory = await fs.open(this.directory, 'r');
 
     try {
       await directory.sync();
     } catch (e) {
-      if (!['EINVAL', 'ENOTSUP'].includes(e.code)) {
-        throw e;
-      }
+      if (!['EINVAL', 'ENOTSUP'].includes(e.code)) throw e;
     } finally {
       await directory.close();
     }
@@ -416,14 +372,12 @@ class Store {
       const result = await fn(next);
 
       await this.write(next);
-
       this.state = next;
 
       return structuredClone(result);
     });
 
     this.queue = operation.catch(() => {});
-
     return operation;
   }
 
@@ -535,9 +489,7 @@ function clearChoices(s, m) {
 
   for (const perDay of Object.values(s.boosts)) {
     for (const [uid, mid] of Object.entries(perDay)) {
-      if (mid === m.id) {
-        delete perDay[uid];
-      }
+      if (mid === m.id) delete perDay[uid];
     }
   }
 
@@ -558,9 +510,11 @@ function confirmPick(
   const m = match(s, mid);
 
   need(
-    available(m, now),
-    'Ce match est fermé.'
+    !s.votes[mid]?.[uid],
+    'Ton pronostic est déjà validé et ne peut plus être modifié.'
   );
+
+  need(available(m, now), 'Ce match est fermé.');
 
   need(
     revision === m.revision,
@@ -576,14 +530,10 @@ function confirmPick(
 
   const old = s.boosts[m.date][uid];
 
-  if (old && old !== mid && boosted) {
-    const other = s.matches[old];
-
-    need(
-      other && available(other, now),
-      'Ton boost est déjà verrouillé sur un match commencé ou clôturé.'
-    );
-  }
+  need(
+    !boosted || !old || old === mid,
+    'Ton boost de cette journée est déjà utilisé sur un autre match.'
+  );
 
   s.votes[mid] ||= {};
 
@@ -633,8 +583,7 @@ function rankings(s, range) {
       r.name = v.name || r.name;
 
       if (m.result === v.side) {
-        const boost =
-          s.boosts[m.date]?.[uid] === m.id;
+        const boost = s.boosts[m.date]?.[uid] === m.id;
 
         r.points += boost ? 4 : 2;
         r.wins++;
@@ -669,8 +618,7 @@ function rankings(s, range) {
 
 function rangeOptions(options) {
   const period =
-    options.getString('periode') ||
-    'semaine';
+    options.getString('periode') || 'semaine';
 
   const start = options.getString('debut');
   const end = options.getString('fin');
@@ -700,9 +648,7 @@ function rangeOptions(options) {
     return { label: 'général' };
   }
 
-  const monday = weekKey(
-    parisDate(Date.now())
-  );
+  const monday = weekKey(parisDate(Date.now()));
 
   return {
     start: monday,
@@ -715,23 +661,18 @@ function baseEmbed(title) {
   return new EmbedBuilder()
     .setColor(RED)
     .setTitle(title)
-    .setFooter({
-      text: 'GOAT Betclic | 2 points • Boost x2 • Heure de Paris',
-    });
+    .setFooter({ text: 'GOAT Betclic' });
 }
 
 function media(m, e) {
   if (m.imageFile) {
-    const name =
-      `goat-${m.id}${path.extname(m.imageFile)}`;
+    const name = `goat-${m.id}${path.extname(m.imageFile)}`;
 
     e.setImage(`attachment://${name}`);
 
     return {
       files: [
-        new AttachmentBuilder(m.imageFile, {
-          name,
-        }),
+        new AttachmentBuilder(m.imageFile, { name }),
       ],
     };
   }
@@ -750,28 +691,26 @@ function publicCard(m) {
     .setDescription([
       m.description
         ? safe(m.description)
-        : 'Qui va gagner ce match ? Fais ton choix !',
+        : 'Qui va gagner ce match ?',
       '',
-      `🏀 **${safe(m.home)}** | cote **${fmtOdd(m.homeOdds)}**`,
-      `🏀 **${safe(m.away)}** | cote **${fmtOdd(m.awayOdds)}**`,
+      `🟢 **${safe(m.home)}**  ·  **${fmtOdd(m.homeOdds)}**`,
       '',
-      `📅 Journée : **${m.date}**`,
-      `🔒 Fermeture : **${formatTime(m.closeAt)}**, heure de Paris`,
+      '**VS**',
       '',
-      '**Bon choix : 2 points. Avec le boost : 4 points.**',
-      'Un seul boost par journée. Clique sur une équipe puis valide ton choix.',
-      'Les cotes sont indicatives et ne multiplient pas les points.',
+      `🔴 **${safe(m.away)}**  ·  **${fmtOdd(m.awayOdds)}**`,
+      '',
+      'Choisis ton équipe, puis confirme ton pronostic.',
+      '',
+      '**2 points** si tu as juste. **4 points** avec le boost.',
+      'Un seul boost par journée. Une fois validé, ton choix est définitif.',
       m.result === 'void'
         ? '\nMatch annulé : aucun point.'
         : ['home', 'away'].includes(m.result)
-          ? `\n✅ Gagnant : **${safe(
+          ? `\n✅ Victoire : **${safe(
             m.result === 'home' ? m.home : m.away
           )}**`
           : '',
-    ].filter(Boolean).join('\n'))
-    .setFooter({
-      text: `GOAT Betclic | Match ${m.id}`,
-    });
+    ].join('\n'));
 
   return {
     embeds: [e],
@@ -780,23 +719,20 @@ function publicCard(m) {
       row(
         btn(
           `pick:${m.id}:home:${m.revision}`,
-          m.home,
-          ButtonStyle.Primary,
+          `🟢 ${m.home}`,
+          ButtonStyle.Success,
           !active
         ),
         btn(
           `pick:${m.id}:away:${m.revision}`,
-          m.away,
-          ButtonStyle.Primary,
+          `🔴 ${m.away}`,
+          ButtonStyle.Danger,
           !active
         ),
         btn(
           `my:${m.id}`,
-          '📋 Mon choix'
-        ),
-        btn(
-          `rank:${weekKey(m.date)}:${shiftDate(weekKey(m.date), 6)}:0`,
-          '🏆 Classement'
+          '📋 Mon choix',
+          ButtonStyle.Secondary
         )
       ),
     ],
@@ -813,22 +749,25 @@ function pickPreview(s, m, uid) {
   );
 
   const old = s.boosts[m.date]?.[uid];
+  const boostUsed = Boolean(old && old !== m.id);
 
-  const e = baseEmbed('📋 Valide ton pronostic')
+  const e = baseEmbed('Confirme ton pronostic')
     .setDescription([
-      `**${safe(m.home)} / ${safe(m.away)}**`,
-      `Ton choix : **${safe(
+      `**${safe(m.home)} VS ${safe(m.away)}**`,
+      '',
+      `${d.side === 'home' ? '🟢' : '🔴'} Ton choix : **${safe(
         d.side === 'home' ? m.home : m.away
       )}**`,
+      '',
       d.boost
-        ? '⚡ Boost x2 sélectionné : **4 points** si tu as juste.'
+        ? '⚡ **Boost x2** : 4 points si tu as juste.'
         : '🎯 **2 points** si tu as juste.',
-      `🔒 Fermeture : ${formatTime(m.closeAt)}`,
-      old && old !== m.id && d.boost
-        ? '\nTon boost sera déplacé de ton autre match vers celui-ci.'
+      '',
+      boostUsed
+        ? 'Ton boost de cette journée est déjà utilisé sur un autre match.\n'
         : '',
-      '\nClique sur **Valider** pour enregistrer. Tu pourras modifier avant la fermeture.',
-    ].filter(Boolean).join('\n'));
+      '**Tu confirmes ?** Une fois validé, tu ne pourras plus modifier ton pronostic.',
+    ].join('\n'));
 
   return {
     content: '',
@@ -837,22 +776,19 @@ function pickPreview(s, m, uid) {
       row(
         btn(
           `validate:${m.id}:${d.revision}:${d.version}`,
-          '✅ Valider',
+          '✅ Valider mon choix',
           ButtonStyle.Success
         ),
         btn(
           `boost:${m.id}`,
-          d.boost
-            ? 'Retirer le boost'
-            : '⚡ Boost x2'
+          d.boost ? 'Retirer le boost' : '⚡ Boost x2',
+          ButtonStyle.Primary,
+          boostUsed
         ),
         btn(
-          `pick:${m.id}:home:${m.revision}`,
-          m.home
-        ),
-        btn(
-          `pick:${m.id}:away:${m.revision}`,
-          m.away
+          `cancel:${m.id}`,
+          'Annuler',
+          ButtonStyle.Secondary
         )
       ),
     ],
@@ -860,26 +796,153 @@ function pickPreview(s, m, uid) {
   };
 }
 
+function myChoice(s, m, uid) {
+  const v = s.votes[m.id]?.[uid];
+
+  if (!v) {
+    return {
+      content: 'Tu n’as pas encore validé de pronostic pour ce match. Choisis une équipe sur le message du match.',
+      embeds: [],
+      components: [],
+    };
+  }
+
+  const boost = s.boosts[m.date]?.[uid] === m.id;
+
+  const e = baseEmbed('✅ Ton pronostic est enregistré')
+    .setColor(0x2ECC71)
+    .setDescription([
+      `**${safe(m.home)} VS ${safe(m.away)}**`,
+      '',
+      `${v.side === 'home' ? '🟢' : '🔴'} Ton choix : **${safe(
+        v.side === 'home' ? m.home : m.away
+      )}**`,
+      '',
+      boost
+        ? '⚡ Boost x2 enregistré. **4 points** si tu as juste.'
+        : '🎯 **2 points** si tu as juste.',
+      '',
+      'Ton choix est définitif. Tu peux le retrouver avec **Mon choix**.',
+    ].join('\n'));
+
+  return {
+    content: '',
+    embeds: [e],
+    components: [],
+    allowedMentions: { parse: [] },
+  };
+}
+
+function staffCard(m) {
+  const labels = {
+    scheduled: 'Programmé',
+    published: 'Publié',
+    deleted: 'Supprimé',
+    draft: 'Brouillon',
+  };
+
+  const result = m.result === 'void'
+    ? 'Annulé'
+    : m.result === 'home'
+      ? safe(m.home)
+      : m.result === 'away'
+        ? safe(m.away)
+        : 'En attente';
+
+  const e = baseEmbed(`📋 ${m.title}`)
+    .setDescription(
+      `**ID :** \`${m.id}\`\n` +
+      `**Statut :** ${labels[m.status] || m.status}`
+    )
+    .addFields(
+      {
+        name: 'Match',
+        value: `${safe(m.home)} VS ${safe(m.away)}`,
+      },
+      {
+        name: 'Cotes',
+        value:
+          `${safe(m.home)} : **${fmtOdd(m.homeOdds)}**\n` +
+          `${safe(m.away)} : **${fmtOdd(m.awayOdds)}**`,
+      },
+      {
+        name: 'Publication - Paris',
+        value: formatTime(m.publishAt),
+        inline: true,
+      },
+      {
+        name: 'Fermeture - Paris',
+        value: formatTime(m.closeAt),
+        inline: true,
+      },
+      {
+        name: 'Journée du boost',
+        value: m.date,
+        inline: true,
+      },
+      {
+        name: 'Salon',
+        value: `<#${m.channelId}>`,
+        inline: true,
+      },
+      {
+        name: 'Notification',
+        value: m.roleId ? `<@&${m.roleId}>` : 'Aucune',
+        inline: true,
+      },
+      {
+        name: 'Résultat',
+        value: result,
+        inline: true,
+      },
+      {
+        name: 'Image',
+        value: m.image
+          ? `[Ouvrir l’image](${m.image})`
+          : 'Aucune',
+      },
+      {
+        name: 'Texte',
+        value: m.description
+          ? safe(m.description).slice(0, 1000)
+          : 'Texte par défaut',
+      }
+    )
+    .setFooter({
+      text: `GOAT Betclic | Fiche ${m.id}`,
+    });
+
+  if (m.post?.id && m.status !== 'deleted') {
+    e.addFields({
+      name: 'Message public',
+      value:
+        `[Ouvrir le message](https://discord.com/channels/` +
+        `${process.env.DISCORD_GUILD_ID}/` +
+        `${m.post.channelId}/${m.post.id})`,
+    });
+  }
+
+  return {
+    embeds: [e],
+    allowedMentions: { parse: [] },
+  };
+}
+
 function rankCard(s, range, page = 0) {
   const values = rankings(s, range);
-
-  const pages = Math.max(
-    1,
-    Math.ceil(values.length / 15)
-  );
+  const pages = Math.max(1, Math.ceil(values.length / 15));
 
   page = Math.max(
     0,
     Math.min(Number(page) || 0, pages - 1)
   );
 
-  const pending = Object.values(s.matches)
-    .filter(m =>
-      m.status !== 'deleted' &&
-      (!range.start || m.date >= range.start) &&
-      (!range.end || m.date <= range.end) &&
-      m.result === null
-    ).length;
+  const pending = Object.values(s.matches).filter(m =>
+    m.status !== 'deleted' &&
+    (!range.start || m.date >= range.start) &&
+    (!range.end || m.date <= range.end) &&
+    m.result === null
+  ).length;
 
   const e = baseEmbed(
     `🏆 GOAT Betclic | Classement ${range.label}`
@@ -895,9 +958,7 @@ function rankCard(s, range, page = 0) {
     )
     .addFields(
       {
-        name: pending
-          ? '⏳ Provisoire'
-          : '✅ Résultats saisis',
+        name: pending ? '⏳ Provisoire' : '✅ Résultats saisis',
         value: pending
           ? `${pending} résultat(s) encore à saisir.`
           : 'Tous les résultats enregistrés sont saisis.',
@@ -945,10 +1006,7 @@ function listCard(s, date, page = 0) {
       a.publishAt - b.publishAt
     );
 
-  const pages = Math.max(
-    1,
-    Math.ceil(values.length / 8)
-  );
+  const pages = Math.max(1, Math.ceil(values.length / 8));
 
   page = Math.max(
     0,
@@ -956,20 +1014,15 @@ function listCard(s, date, page = 0) {
   );
 
   const e = baseEmbed(
-    date
-      ? `📅 Matchs du ${date}`
-      : '📅 GOAT Betclic | Matchs'
+    date ? `📅 Matchs du ${date}` : '📅 GOAT Betclic | Matchs'
   )
     .setDescription(
-      values
-        .slice(page * 8, page * 8 + 8)
-        .map(m =>
-          `**${safe(m.home)} / ${safe(m.away)}**\n` +
-          `ID : \`${m.id}\` | ${m.status}\n` +
-          `Publication : ${formatTime(m.publishAt)}\n` +
-          `Fermeture : ${formatTime(m.closeAt)} | <#${m.channelId}>`
-        )
-        .join('\n\n') ||
+      values.slice(page * 8, page * 8 + 8).map(m =>
+        `**${safe(m.home)} VS ${safe(m.away)}**\n` +
+        `ID : \`${m.id}\` | ${m.status}\n` +
+        `Publication : ${formatTime(m.publishAt)}\n` +
+        `Fermeture : ${formatTime(m.closeAt)} | <#${m.channelId}>`
+      ).join('\n\n') ||
       'Aucun match. Utilise /goat create-match.'
     )
     .setFooter({
@@ -1008,17 +1061,11 @@ function addMatchOptions(s, edit = false) {
   }
 
   s.addStringOption(o =>
-    o.setName('titre')
-      .setDescription('Titre du message')
-      .setMaxLength(200)
+    o.setName('equipe-a')
+      .setDescription('Première équipe')
+      .setMaxLength(70)
       .setRequired(!edit)
   )
-    .addStringOption(o =>
-      o.setName('equipe-a')
-        .setDescription('Première équipe')
-        .setMaxLength(70)
-        .setRequired(!edit)
-    )
     .addStringOption(o =>
       o.setName('equipe-b')
         .setDescription('Deuxième équipe')
@@ -1048,9 +1095,7 @@ function addMatchOptions(s, edit = false) {
     )
     .addStringOption(o =>
       o.setName('fermeture')
-        .setDescription(
-          'Début du match, Paris : HH:mm AAAA-MM-JJ'
-        )
+        .setDescription('Début du match, Paris : HH:mm AAAA-MM-JJ')
         .setRequired(!edit)
     )
     .addChannelOption(o =>
@@ -1063,6 +1108,13 @@ function addMatchOptions(s, edit = false) {
         .setRequired(!edit)
     )
     .addStringOption(o =>
+      o.setName('titre')
+        .setDescription(
+          'Titre libre, facultatif : sinon Équipe A VS Équipe B'
+        )
+        .setMaxLength(200)
+    )
+    .addStringOption(o =>
       o.setName('journee')
         .setDescription(
           'Date sportive AAAA-MM-JJ, sinon date de publication'
@@ -1070,9 +1122,7 @@ function addMatchOptions(s, edit = false) {
     )
     .addStringOption(o =>
       o.setName('image')
-        .setDescription(
-          'URL de l’image, copier le lien de l’image'
-        )
+        .setDescription('URL de l’image, copier le lien de l’image')
         .setMaxLength(1000)
     )
     .addStringOption(o =>
@@ -1110,14 +1160,8 @@ function addRangeOptions(s) {
     o.setName('periode')
       .setDescription('Semaine actuelle ou classement général')
       .addChoices(
-        {
-          name: 'Semaine actuelle',
-          value: 'semaine',
-        },
-        {
-          name: 'Général',
-          value: 'general',
-        }
+        { name: 'Semaine actuelle', value: 'semaine' },
+        { name: 'Général', value: 'general' }
       )
   )
     .addStringOption(o =>
@@ -1132,9 +1176,8 @@ function addRangeOptions(s) {
 
 const command = new SlashCommandBuilder()
   .setName('goat')
-  .setDescription(
-    'GOAT Betclic : matchs, résultats et classements'
-  )
+  .setDescription('GOAT Betclic : matchs, résultats et classements')
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand(s =>
     addMatchOptions(
       s.setName('create-match')
@@ -1146,17 +1189,13 @@ const command = new SlashCommandBuilder()
   .addSubcommand(s =>
     addMatchOptions(
       s.setName('edit-match')
-        .setDescription(
-          'Modifier un match programmé ou publié'
-        ),
+        .setDescription('Modifier un match programmé ou publié'),
       true
     )
   )
   .addSubcommand(s =>
     s.setName('delete-match')
-      .setDescription(
-        'Supprimer un match avec confirmation'
-      )
+      .setDescription('Supprimer un match avec confirmation')
       .addStringOption(o =>
         o.setName('id')
           .setDescription('ID du match')
@@ -1176,22 +1215,10 @@ const command = new SlashCommandBuilder()
           .setDescription('Résultat')
           .setRequired(true)
           .addChoices(
-            {
-              name: 'Équipe A',
-              value: 'home',
-            },
-            {
-              name: 'Équipe B',
-              value: 'away',
-            },
-            {
-              name: 'Annulé',
-              value: 'void',
-            },
-            {
-              name: 'En attente',
-              value: 'pending',
-            }
+            { name: 'Équipe A', value: 'home' },
+            { name: 'Équipe B', value: 'away' },
+            { name: 'Annulé', value: 'void' },
+            { name: 'En attente', value: 'pending' }
           )
       )
   )
@@ -1213,9 +1240,7 @@ const command = new SlashCommandBuilder()
   )
   .addSubcommand(s =>
     s.setName('list')
-      .setDescription(
-        'Voir les matchs et leurs identifiants'
-      )
+      .setDescription('Voir les matchs et leurs identifiants')
   )
   .addSubcommand(s =>
     s.setName('day')
@@ -1233,8 +1258,7 @@ const command = new SlashCommandBuilder()
       )
   );
 
-// Les liens d'images Discord expirent.
-// Les images Discord sont copiées sur le volume.
+// Conservation des images Discord sur le volume.
 async function cacheImage(m, directory) {
   m.imageFile = '';
 
@@ -1259,9 +1283,7 @@ async function cacheImage(m, directory) {
     'Impossible de récupérer cette image Discord. Recopie un lien récent.'
   );
 
-  const type = response.headers
-    .get('content-type')
-    ?.split(';')[0];
+  const type = response.headers.get('content-type')?.split(';')[0];
 
   const ext = {
     'image/png': '.png',
@@ -1270,15 +1292,11 @@ async function cacheImage(m, directory) {
     'image/gif': '.gif',
   }[type];
 
-  need(
-    ext,
-    'Utilise une image PNG, JPG, WEBP ou GIF.'
-  );
+  need(ext, 'Utilise une image PNG, JPG, WEBP ou GIF.');
 
   need(
-    Number(
-      response.headers.get('content-length') || 0
-    ) <= 8 * 1024 * 1024,
+    Number(response.headers.get('content-length') || 0) <=
+      8 * 1024 * 1024,
     'Image trop lourde : maximum 8 Mo.'
   );
 
@@ -1297,38 +1315,35 @@ async function cacheImage(m, directory) {
   }
 
   const buffer = Buffer.concat(chunks);
-
   const folder = path.join(directory, 'images');
 
-  await fs.mkdir(folder, {
-    recursive: true,
-  });
+  await fs.mkdir(folder, { recursive: true });
 
   const hash = createHash('sha256')
     .update(buffer)
     .digest('hex')
     .slice(0, 16);
 
-  const imagePath = path.join(
-    folder,
-    `${m.id}-${hash}${ext}`
-  );
+  const imagePath = path.join(folder, `${m.id}-${hash}${ext}`);
 
-  await fs.writeFile(imagePath, buffer, {
-    mode: 0o600,
-  });
-
+  await fs.writeFile(imagePath, buffer, { mode: 0o600 });
   m.imageFile = imagePath;
 }
 
 async function run() {
   const env = process.env;
   const guildId = env.DISCORD_GUILD_ID?.trim();
+  const staffId = env.STAFF_CHANNEL_ID?.trim();
 
   need(
     env.DISCORD_TOKEN &&
     /^\d{17,20}$/.test(guildId || ''),
     'Renseigne DISCORD_TOKEN et DISCORD_GUILD_ID.'
+  );
+
+  need(
+    /^\d{17,20}$/.test(staffId || ''),
+    'Renseigne STAFF_CHANNEL_ID avec l’ID du salon staff GOAT Betclic.'
   );
 
   const admins = new Set(
@@ -1346,6 +1361,13 @@ async function run() {
 
   const store = createStore(env);
   await store.init();
+
+  // Actualiser les anciens messages avec les nouveaux boutons.
+  await store.change(s => {
+    for (const m of Object.values(s.matches)) {
+      if (m.status === 'published') m.dirty = true;
+    }
+  });
 
   const client = new Client({
     intents: [GatewayIntentBits.Guilds],
@@ -1421,9 +1443,16 @@ async function run() {
 
       const found = messages.find(x =>
         x.author.id === client.user.id &&
-        x.embeds.some(e =>
-          e.footer?.text ===
-          `GOAT Betclic | Match ${m.id}`
+        (
+          x.embeds.some(e =>
+            e.footer?.text === `GOAT Betclic | Match ${m.id}`
+          ) ||
+          x.components.some(r =>
+            r.components.some(b =>
+              b.customId?.startsWith(`pick:${m.id}:`) ||
+              b.customId === `my:${m.id}`
+            )
+          )
         )
       );
 
@@ -1431,10 +1460,7 @@ async function run() {
 
       const last = messages.last();
 
-      if (
-        last.createdTimestamp <
-        m.sendStartedAt - 10000
-      ) {
+      if (last.createdTimestamp < m.sendStartedAt - 10000) {
         return null;
       }
 
@@ -1446,15 +1472,102 @@ async function run() {
     );
   }
 
-  async function tick() {
+  async function syncStaff(m) {
+    const c = await channel(staffId);
+    const payload = staffCard(m);
+
+    const digest = createHash('sha256')
+      .update(JSON.stringify(payload.embeds[0].toJSON()))
+      .digest('hex');
+
     if (
-      ticking ||
-      stopping ||
-      !client.isReady()
+      m.staffPost?.channelId === staffId &&
+      m.staffDigest === digest
     ) {
       return;
     }
 
+    let previous;
+
+    if (m.staffPost?.channelId === staffId) {
+      try {
+        previous = await c.messages.fetch(m.staffPost.id);
+      } catch (e) {
+        if (e.code !== 10008) throw e;
+      }
+    }
+
+    if (!previous) {
+      const since = m.staffSendAt || Date.now();
+
+      if (!m.staffSendAt) {
+        await store.change(s => {
+          s.matches[m.id].staffSendAt = since;
+        });
+      }
+
+      let before;
+
+      for (let n = 0; n < 100; n++) {
+        const items = await c.messages.fetch({
+          limit: 100,
+          ...(before ? { before } : {}),
+        });
+
+        if (!items.size) break;
+
+        previous = items.find(x =>
+          x.author.id === client.user.id &&
+          x.embeds.some(e =>
+            e.footer?.text === `GOAT Betclic | Fiche ${m.id}`
+          )
+        );
+
+        if (
+          previous ||
+          items.last().createdTimestamp < since - 10000
+        ) {
+          break;
+        }
+
+        before = items.last().id;
+
+        if (n === 99) {
+          throw new Error(
+            'Historique staff trop long pour vérifier l’envoi.'
+          );
+        }
+      }
+    }
+
+    const nonce = BigInt(
+      '0x' +
+      createHash('sha256')
+        .update(`staff:${m.id}`)
+        .digest('hex')
+        .slice(0, 16)
+    ).toString();
+
+    const message = previous
+      ? await previous.edit(payload)
+      : await c.send({
+        ...payload,
+        nonce,
+        enforceNonce: true,
+      });
+
+    await store.change(s => {
+      s.matches[m.id].staffPost = {
+        id: message.id,
+        channelId: staffId,
+      };
+
+      s.matches[m.id].staffDigest = digest;
+    });
+  }
+
+  async function tick() {
+    if (ticking || stopping || !client.isReady()) return;
     ticking = true;
 
     try {
@@ -1464,13 +1577,16 @@ async function run() {
         .sort((a, b) => a.publishAt - b.publishAt);
 
       for (const m of matches) {
+        try {
+          await syncStaff(m);
+        } catch (e) {
+          log(`Fiche staff ${m.id}`, e);
+        }
+
         if (m.status === 'deleted') {
           if (m.post?.id) {
             try {
-              const c = await channel(
-                m.post.channelId
-              );
-
+              const c = await channel(m.post.channelId);
               const msg = await recover(c, m);
 
               if (msg) await msg.delete();
@@ -1496,28 +1612,16 @@ async function run() {
 
         const refresh =
           m.status === 'published' &&
-          (
-            m.dirty ||
-            m.lastOpen !== active
-          );
+          (m.dirty || m.lastOpen !== active);
 
         if (!scheduled && !refresh) continue;
 
         try {
           let target = m;
 
-          if (
-            m.post &&
-            m.post.channelId !== m.channelId
-          ) {
-            const oldChannel = await channel(
-              m.post.channelId
-            );
-
-            const old = await recover(
-              oldChannel,
-              m
-            );
+          if (m.post && m.post.channelId !== m.channelId) {
+            const oldChannel = await channel(m.post.channelId);
+            const old = await recover(oldChannel, m);
 
             if (old) await old.delete();
 
@@ -1559,9 +1663,7 @@ async function run() {
             const nonce = BigInt(
               '0x' +
               createHash('sha256')
-                .update(
-                  `${m.id}:${target.sendStartedAt}`
-                )
+                .update(`${m.id}:${target.sendStartedAt}`)
                 .digest('hex')
                 .slice(0, 16)
             ).toString();
@@ -1576,10 +1678,7 @@ async function run() {
                   : '',
               allowedMentions:
                 m.status === 'scheduled' && m.roleId
-                  ? {
-                    parse: [],
-                    roles: [m.roleId],
-                  }
+                  ? { parse: [], roles: [m.roleId] }
                   : quiet,
             });
           }
@@ -1592,9 +1691,7 @@ async function run() {
               channelId: m.channelId,
             };
 
-            if (latest.status === 'deleted') {
-              return true;
-            }
+            if (latest.status === 'deleted') return true;
 
             latest.status = 'published';
             latest.lastOpen = active;
@@ -1649,10 +1746,7 @@ async function run() {
             'Confirmer',
             ButtonStyle.Danger
           ),
-          btn(
-            `admin-cancel:${token}`,
-            'Annuler'
-          )
+          btn(`admin-cancel:${token}`, 'Annuler')
         ),
       ],
       allowedMentions: quiet,
@@ -1666,29 +1760,16 @@ async function run() {
     );
 
     const sub = i.options.getSubcommand();
+    admin(i);
 
-    if (sub !== 'leaderboard') {
-      admin(i);
-    }
+    await i.deferReply({ flags: privateFlag });
 
-    await i.deferReply({
-      flags: sub === 'leaderboard'
-        ? undefined
-        : privateFlag,
-    });
-
-    if (
-      sub === 'create-match' ||
-      sub === 'edit-match'
-    ) {
+    if (sub === 'create-match' || sub === 'edit-match') {
       const o = i.options;
       const editing = sub === 'edit-match';
 
       const before = editing
-        ? match(
-          await store.read(),
-          o.getString('id')
-        )
+        ? match(await store.read(), o.getString('id'))
         : null;
 
       const m = before
@@ -1719,7 +1800,6 @@ async function run() {
 
       for (const [key, prop] of Object.entries(strings)) {
         const v = o.getString(key);
-
         if (v !== null) m[prop] = v;
       }
 
@@ -1728,20 +1808,15 @@ async function run() {
         ['cote-b', 'awayOdds'],
       ]) {
         const v = o.getNumber(key);
-
         if (v !== null) m[prop] = v;
       }
 
       if (o.getString('publication')) {
-        m.publishAt = parseTime(
-          o.getString('publication')
-        );
+        m.publishAt = parseTime(o.getString('publication'));
       }
 
       if (o.getString('fermeture')) {
-        m.closeAt = parseTime(
-          o.getString('fermeture')
-        );
+        m.closeAt = parseTime(o.getString('fermeture'));
       }
 
       if (o.getChannel('salon')) {
@@ -1752,34 +1827,23 @@ async function run() {
         m.roleId = o.getRole('notification').id;
       }
 
-      if (
-        editing &&
-        o.getBoolean('retirer-image')
-      ) {
+      if (editing && o.getBoolean('retirer-image')) {
         m.image = '';
         m.imageFile = '';
       }
 
-      if (
-        editing &&
-        o.getBoolean('retirer-notification')
-      ) {
+      if (editing && o.getBoolean('retirer-notification')) {
         m.roleId = null;
       }
 
-      if (!m.date) {
-        m.date = parisDate(m.publishAt);
-      }
+      if (!m.date) m.date = parisDate(m.publishAt);
+      if (!m.title) m.title = `${m.home} VS ${m.away}`;
 
-      // Une clôture passée ne peut pas être rouverte.
       if (
         before?.status === 'published' &&
         Date.now() >= before.closeAt
       ) {
-        m.closeAt = Math.min(
-          m.closeAt,
-          before.closeAt
-        );
+        m.closeAt = Math.min(m.closeAt, before.closeAt);
       }
 
       validate(m);
@@ -1792,20 +1856,14 @@ async function run() {
         );
       }
 
-      if (
-        !before ||
-        before.status !== 'published'
-      ) {
+      if (!before || before.status !== 'published') {
         need(
           m.closeAt > Date.now(),
           'La fermeture doit être dans le futur.'
         );
       }
 
-      if (
-        !before ||
-        before.image !== m.image
-      ) {
+      if (!before || before.image !== m.image) {
         await cacheImage(m, store.directory);
       }
 
@@ -1817,9 +1875,8 @@ async function run() {
 
       const state = await store.read();
 
-      const hasChoices = Object.keys(
-        state.votes[m.id] || {}
-      ).length > 0;
+      const hasChoices =
+        Object.keys(state.votes[m.id] || {}).length > 0;
 
       if (sensitive && hasChoices) {
         need(
@@ -1844,9 +1901,7 @@ async function run() {
             'Le match a changé. Recommence la modification.'
           );
 
-          if (sensitive) {
-            clearChoices(s, current);
-          }
+          if (sensitive) clearChoices(s, current);
 
           m.revision = current.revision;
           m.result = current.result;
@@ -1866,15 +1921,8 @@ async function run() {
 
       return i.editReply({
         content:
-          `✅ ${editing ? 'Match modifié' : 'Match créé et programmé'}.\n` +
-          `**ID :** \`${m.id}\`\n` +
-          `**${safe(m.title)}**\n` +
-          `${safe(m.home)} (${fmtOdd(m.homeOdds)}) / ` +
-          `${safe(m.away)} (${fmtOdd(m.awayOdds)})\n` +
-          `Publication : **${formatTime(m.publishAt)}**\n` +
-          `Fermeture : **${formatTime(m.closeAt)}**\n` +
-          `Salon : <#${m.channelId}>\n` +
-          `Journée du boost et des points : **${m.date}**`,
+          `✅ ${editing ? 'Match modifié' : 'Match créé et programmé'}. ` +
+          `La fiche complète est disponible dans <#${staffId}>.`,
         allowedMentions: quiet,
       });
     }
@@ -1882,10 +1930,7 @@ async function run() {
     const s = await store.read();
 
     if (sub === 'delete-match') {
-      const m = match(
-        s,
-        i.options.getString('id')
-      );
+      const m = match(s, i.options.getString('id'));
 
       return pending(i, {
         kind: 'delete',
@@ -1908,10 +1953,7 @@ async function run() {
           'Le match n’a pas encore commencé.'
         );
 
-        m.result = result === 'pending'
-          ? null
-          : result;
-
+        m.result = result === 'pending' ? null : result;
         m.dirty = true;
         m.version++;
 
@@ -1945,10 +1987,12 @@ async function run() {
 
       return i.editReply([
         `✅ Sauvegarde : ${store.filename}`,
+        `📋 Salon staff : <#${staffId}>`,
         `📅 ${all.filter(m => m.status === 'scheduled').length} matchs programmés`,
         `📣 ${all.filter(m => m.status === 'published').length} matchs publiés`,
         `⏳ ${all.filter(m => m.result === null && m.closeAt < Date.now()).length} résultats à saisir`,
-        '🏆 Classements uniquement sur commande',
+        '🏆 Classements réservés au staff, uniquement sur commande',
+        '🔒 Pronostics définitifs après validation',
         '🕰 Heure de Paris',
         `📦 ${s.archives.length} archives`,
       ].join('\n'));
@@ -1990,8 +2034,7 @@ async function run() {
         )) {
           if (v.revision !== m.revision) continue;
 
-          const boost =
-            s.boosts[m.date]?.[uid] === m.id;
+          const boost = s.boosts[m.date]?.[uid] === m.id;
 
           rows.push([
             m.date,
@@ -2003,9 +2046,7 @@ async function run() {
             v.side === 'home' ? m.home : m.away,
             boost ? 'oui' : 'non',
             m.result || 'en attente',
-            m.result === v.side
-              ? (boost ? 4 : 2)
-              : 0,
+            m.result === v.side ? (boost ? 4 : 2) : 0,
           ]);
         }
       }
@@ -2029,16 +2070,13 @@ async function run() {
         ]),
       ];
 
-      const file = (data, name) =>
-        new AttachmentBuilder(
-          Buffer.from(
-            '\uFEFF' +
-            data
-              .map(r => r.map(csv).join(';'))
-              .join('\r\n')
-          ),
-          { name }
-        );
+      const file = (data, name) => new AttachmentBuilder(
+        Buffer.from(
+          '\uFEFF' +
+          data.map(r => r.map(csv).join(';')).join('\r\n')
+        ),
+        { name }
+      );
 
       return i.editReply({
         content: `📁 Export ${range.label}`,
@@ -2051,25 +2089,18 @@ async function run() {
   }
 
   async function buttons(i) {
-    need(
-      i.guildId === guildId,
-      'Serveur invalide.'
-    );
+    need(i.guildId === guildId, 'Serveur invalide.');
 
-    const [action, mid, side, rev] =
-      i.customId.split(':');
+    const [action, mid, side, rev] = i.customId.split(':');
 
     if (i.message.flags.has(privateFlag)) {
       await i.deferUpdate();
     } else {
-      await i.deferReply({
-        flags: privateFlag,
-      });
+      await i.deferReply({ flags: privateFlag });
     }
 
     if (action.startsWith('admin-')) {
       admin(i);
-
       const token = mid;
 
       await store.change(s => {
@@ -2095,9 +2126,7 @@ async function run() {
               action: 'suppression',
               at: Date.now(),
               match: structuredClone(m),
-              votes: structuredClone(
-                s.votes[m.id] || {}
-              ),
+              votes: structuredClone(s.votes[m.id] || {}),
             });
 
             clearChoices(s, m);
@@ -2114,12 +2143,7 @@ async function run() {
             });
           }
 
-          audit(
-            s,
-            i.user.id,
-            p.kind,
-            p.mid
-          );
+          audit(s, i.user.id, p.kind, p.mid);
         }
 
         delete s.pending[token];
@@ -2137,21 +2161,20 @@ async function run() {
     }
 
     if (action === 'rank') {
-      const [, start, end, page] =
-        i.customId.split(':');
+      admin(i);
 
-      const range = start === 'all'
-        ? { label: 'général' }
-        : {
-          start,
-          end,
-          label: `du ${start} au ${end}`,
-        };
+      const [, start, end, page] = i.customId.split(':');
 
       return i.editReply(
         rankCard(
           await store.read(),
-          range,
+          start === 'all'
+            ? { label: 'général' }
+            : {
+              start,
+              end,
+              label: `du ${start} au ${end}`,
+            },
           page
         )
       );
@@ -2169,7 +2192,7 @@ async function run() {
       );
     }
 
-    // Compatibilité avec les anciens messages.
+    // Compatibilité avec les boutons de la première version.
     if (['play', 'summary'].includes(action)) {
       const s = await store.read();
       const legacy = s.legacyDays?.[mid]?.[0];
@@ -2189,38 +2212,41 @@ async function run() {
 
     if (action === 'my') {
       const s = await store.read();
-      const m = match(s, mid);
-      const v = s.votes[mid]?.[i.user.id];
 
-      const boosted =
-        s.boosts[m.date]?.[i.user.id] === mid;
+      return i.editReply(
+        myChoice(s, match(s, mid), i.user.id)
+      );
+    }
+
+    // Un choix enregistré ne peut pas être modifié,
+    // même en utilisant les boutons d'un ancien message.
+    if (['pick', 'boost', 'validate'].includes(action)) {
+      const current = await store.read();
+
+      if (current.votes[mid]?.[i.user.id]) {
+        return i.editReply(
+          myChoice(current, match(current, mid), i.user.id)
+        );
+      }
+    }
+
+    if (action === 'cancel') {
+      await store.change(s => {
+        delete s.drafts[mid]?.[i.user.id];
+      });
 
       return i.editReply({
-        content: v
-          ? (
-            `✅ Ton choix validé : **${safe(
-              v.side === 'home' ? m.home : m.away
-            )}**${boosted ? ' ⚡ Boost x2' : ''}\n` +
-            'Pour le modifier avant la fermeture, clique à nouveau sur une équipe.'
-          )
-          : 'Tu n’as pas encore validé de choix. Clique sur une équipe puis sur Valider.',
+        content: 'Choix annulé. Tu peux choisir une équipe sur le message du match.',
         embeds: [],
         components: [],
-        allowedMentions: quiet,
       });
     }
 
-    if (
-      action === 'pick' ||
-      action === 'boost'
-    ) {
+    if (action === 'pick' || action === 'boost') {
       const s = await store.change(x => {
         const m = match(x, mid);
 
-        need(
-          available(m),
-          'Ce match est fermé.'
-        );
+        need(available(m), 'Ce match est fermé.');
 
         x.drafts[mid] ||= {};
 
@@ -2240,21 +2266,19 @@ async function run() {
             revision: m.revision,
             boost:
               x.drafts[mid][i.user.id]?.boost ??
-              (
-                x.boosts[m.date]?.[i.user.id] === mid
-              ),
+              (x.boosts[m.date]?.[i.user.id] === mid),
             version:
-              (
-                x.drafts[mid][i.user.id]?.version ||
-                0
-              ) + 1,
+              (x.drafts[mid][i.user.id]?.version || 0) + 1,
           };
         } else {
           const d = x.drafts[mid][i.user.id];
 
+          need(d, 'Choisis une équipe avant de booster.');
+
           need(
-            d,
-            'Choisis une équipe avant de booster.'
+            !x.boosts[m.date]?.[i.user.id] ||
+            x.boosts[m.date][i.user.id] === mid,
+            'Ton boost est déjà utilisé sur un autre match.'
           );
 
           d.boost = !d.boost;
@@ -2265,11 +2289,7 @@ async function run() {
       });
 
       return i.editReply(
-        pickPreview(
-          s,
-          match(s, mid),
-          i.user.id
-        )
+        pickPreview(s, match(s, mid), i.user.id)
       );
     }
 
@@ -2299,33 +2319,10 @@ async function run() {
       });
 
       const s = await store.read();
-      const m = match(s, mid);
-      const v = s.votes[mid][i.user.id];
 
-      const boosted =
-        s.boosts[m.date]?.[i.user.id] === mid;
-
-      return i.editReply({
-        content:
-          `✅ Pronostic validé : **${safe(
-            v.side === 'home' ? m.home : m.away
-          )}**${boosted ? ' ⚡ Boost x2' : ''}\n` +
-          'Tu peux conserver ce choix ou cliquer sur une autre équipe pour le modifier avant la fermeture.',
-        embeds: [],
-        components: [
-          row(
-            btn(
-              `pick:${mid}:home:${m.revision}`,
-              m.home
-            ),
-            btn(
-              `pick:${mid}:away:${m.revision}`,
-              m.away
-            )
-          ),
-        ],
-        allowedMentions: quiet,
-      });
+      return i.editReply(
+        myChoice(s, match(s, mid), i.user.id)
+      );
     }
   }
 
@@ -2340,7 +2337,7 @@ async function run() {
         await slash(i);
       } else if (
         i.isButton() &&
-        /^(pick|boost|validate|my|rank|list|admin-confirm|admin-cancel|play|summary):/
+        /^(pick|boost|validate|cancel|my|rank|list|admin-confirm|admin-cancel|play|summary):/
           .test(i.customId)
       ) {
         await buttons(i);
@@ -2370,16 +2367,14 @@ async function run() {
     }
   });
 
-  client.on(
-    Events.Error,
-    e => log('Discord', e)
-  );
+  client.on(Events.Error, e => log('Discord', e));
 
   client.once(Events.ClientReady, async () => {
     try {
       const guild = await client.guilds.fetch(guildId);
 
-      // Nettoyer les anciennes commandes de ce bot.
+      await channel(staffId);
+
       const previous = await guild.commands.fetch();
 
       for (const c of previous.values()) {
@@ -2388,8 +2383,7 @@ async function run() {
         }
       }
 
-      const globals =
-        await client.application.commands.fetch();
+      const globals = await client.application.commands.fetch();
 
       for (const c of globals.values()) {
         if (['goat', 'goat-admin'].includes(c.name)) {
@@ -2397,20 +2391,15 @@ async function run() {
         }
       }
 
-      await guild.commands.create(
-        command.toJSON()
-      );
+      await guild.commands.create(command.toJSON());
 
       console.log(
-        'GOAT Betclic prêt. Commandes simplifiées. Stockage sur volume.'
+        'GOAT Betclic prêt. Fiches staff actives. Pronostics définitifs. Stockage sur volume.'
       );
 
       await tick();
 
-      timer = setInterval(
-        () => void tick(),
-        15000
-      );
+      timer = setInterval(() => void tick(), 15000);
     } catch (e) {
       log('Initialisation', e);
       void stop(1);
@@ -2430,10 +2419,7 @@ async function run() {
   }
 
   for (const sig of ['SIGINT', 'SIGTERM']) {
-    process.once(
-      sig,
-      () => void stop()
-    );
+    process.once(sig, () => void stop());
   }
 
   process.once('uncaughtException', e => {
@@ -2476,6 +2462,8 @@ if (require.main === module) {
     command,
     publicCard,
     pickPreview,
+    myChoice,
+    staffCard,
     rankCard,
     listCard,
   };
