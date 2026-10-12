@@ -1,19 +1,9 @@
 'use strict';
 
 const {
-  Client,
-  GatewayIntentBits,
-  Events,
-  MessageFlags,
-  PermissionFlagsBits,
-  SlashCommandBuilder,
-  ChannelType,
-  EmbedBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ActionRowBuilder,
-  AttachmentBuilder,
-  escapeMarkdown,
+  Client, GatewayIntentBits, Events, MessageFlags, PermissionFlagsBits,
+  SlashCommandBuilder, ChannelType, EmbedBuilder, ButtonBuilder, ButtonStyle,
+  ActionRowBuilder, AttachmentBuilder, escapeMarkdown,
 } = require('discord.js');
 
 const { randomUUID, createHash } = require('node:crypto');
@@ -21,11 +11,12 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const ZONE = 'Europe/Paris';
-const id = () => randomUUID().replaceAll('-', '').slice(0, 16);
 
 const RED = /^#[a-f\d]{6}$/i.test(process.env.GOAT_COLOR || '')
   ? process.env.GOAT_COLOR
   : '#E31B23';
+
+const id = () => randomUUID().replaceAll('-', '').slice(0, 16);
 
 class UserError extends Error {}
 
@@ -33,18 +24,11 @@ function need(condition, text) {
   if (!condition) throw new UserError(text);
 }
 
-const safe = text => escapeMarkdown(String(text))
-  .replaceAll('@', '@\u200b');
+const safe = text => escapeMarkdown(String(text)).replaceAll('@', '@\u200b');
 
-const row = (...items) => new ActionRowBuilder()
-  .addComponents(items);
+const row = (...items) => new ActionRowBuilder().addComponents(items);
 
-function btn(
-  key,
-  label,
-  style = ButtonStyle.Secondary,
-  disabled = false
-) {
+function btn(key, label, style = ButtonStyle.Secondary, disabled = false) {
   return new ButtonBuilder()
     .setCustomId(key)
     .setLabel(label.slice(0, 80))
@@ -105,35 +89,27 @@ function dateKey(value) {
 }
 
 function shiftDate(value, days) {
-  const ms =
-    Date.parse(`${dateKey(value)}T12:00:00Z`) +
-    days * 86400000;
-
+  const ms = Date.parse(`${dateKey(value)}T12:00:00Z`) + days * 86400000;
   return new Date(ms).toISOString().slice(0, 10);
 }
 
 function weekKey(value) {
   const date = dateKey(value);
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-
   return shiftDate(date, -(weekday === 0 ? 6 : weekday - 1));
 }
 
 function parseTime(value) {
   let text = value.trim();
 
-  // Format conseillé : 07:00 2026-10-20.
-  // Le format 2026-10-20 07:00 est également accepté.
   if (/^\d{2}:\d{2} \d{4}-\d{2}-\d{2}$/.test(text)) {
     text = text.slice(6) + ' ' + text.slice(0, 5);
   }
 
   if (/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(text)) {
     dateKey(text.slice(0, 10));
-
     const ms = Date.parse(text);
     need(Number.isFinite(ms), 'Date/heure ISO invalide.');
-
     return ms;
   }
 
@@ -149,10 +125,7 @@ function parseTime(value) {
 
   for (let offset = -180; offset <= 180; offset += 30) {
     const ms = utc + offset * 60000;
-
-    if (parisInput(ms) === text) {
-      candidates.push(ms);
-    }
+    if (parisInput(ms) === text) candidates.push(ms);
   }
 
   need(
@@ -173,7 +146,6 @@ function imageURL(value) {
   if (!url) return '';
 
   let parsed;
-
   try {
     parsed = new URL(url);
   } catch {
@@ -181,14 +153,11 @@ function imageURL(value) {
   }
 
   need(
-    parsed.protocol === 'https:' &&
-    !parsed.username &&
-    !parsed.password,
+    parsed.protocol === 'https:' && !parsed.username && !parsed.password,
     'Utilise un lien image HTTPS public.'
   );
 
   need(url.length <= 1000, 'Lien image trop long.');
-
   return url;
 }
 
@@ -204,9 +173,7 @@ function odd(value) {
 }
 
 function clean(value, max, name) {
-  const s = String(value || '')
-    .trim()
-    .replace(/[\u2014\u2013]/g, '-');
+  const s = String(value || '').trim().replace(/[\u2014\u2013]/g, '-');
 
   need(
     s.length > 0 && s.length <= max,
@@ -230,14 +197,7 @@ function initialState() {
 }
 
 function migrate(old) {
-  if (
-    old.schema === 2 &&
-    old.matches &&
-    old.votes &&
-    old.boosts
-  ) {
-    return old;
-  }
+  if (old.schema === 2 && old.matches && old.votes && old.boosts) return old;
 
   need(
     old.schema === 1 && old.days,
@@ -316,15 +276,10 @@ class Store {
     await fs.mkdir(this.directory, { recursive: true });
 
     try {
-      const data = JSON.parse(
-        await fs.readFile(this.filename, 'utf8')
-      );
-
+      const data = JSON.parse(await fs.readFile(this.filename, 'utf8'));
       this.state = migrate(data);
     } catch (e) {
-      // Ne jamais écraser une sauvegarde illisible.
       if (e.code !== 'ENOENT') throw e;
-
       this.state = initialState();
       await this.write(this.state);
     }
@@ -342,10 +297,7 @@ class Store {
     }
 
     try {
-      await fs.copyFile(
-        this.filename,
-        this.filename + '.bak'
-      );
+      await fs.copyFile(this.filename, this.filename + '.bak');
     } catch (e) {
       if (e.code !== 'ENOENT') throw e;
     }
@@ -357,9 +309,7 @@ class Store {
     try {
       await directory.sync();
     } catch (e) {
-      if (!['EINVAL', 'ENOTSUP'].includes(e.code)) {
-        throw e;
-      }
+      if (!['EINVAL', 'ENOTSUP'].includes(e.code)) throw e;
     } finally {
       await directory.close();
     }
@@ -391,15 +341,9 @@ class Store {
 }
 
 function createStore(env = process.env) {
-  const directory =
-    env.DATA_DIR ||
-    env.RAILWAY_VOLUME_MOUNT_PATH ||
-    './data';
+  const directory = env.DATA_DIR || env.RAILWAY_VOLUME_MOUNT_PATH || './data';
 
-  if (
-    env.RAILWAY_ENVIRONMENT_ID &&
-    !env.RAILWAY_VOLUME_MOUNT_PATH
-  ) {
+  if (env.RAILWAY_ENVIRONMENT_ID && !env.RAILWAY_VOLUME_MOUNT_PATH) {
     throw new Error(
       'Attache un volume Railway au service avant de démarrer.'
     );
@@ -407,8 +351,7 @@ function createStore(env = process.env) {
 
   if (
     env.RAILWAY_VOLUME_MOUNT_PATH &&
-    path.resolve(directory) !==
-    path.resolve(env.RAILWAY_VOLUME_MOUNT_PATH)
+    path.resolve(directory) !== path.resolve(env.RAILWAY_VOLUME_MOUNT_PATH)
   ) {
     throw new Error(
       'DATA_DIR doit correspondre au chemin du volume Railway.'
@@ -439,12 +382,7 @@ function match(s, mid) {
 }
 
 function audit(s, uid, action, mid) {
-  s.audit.push({
-    at: Date.now(),
-    uid,
-    action,
-    mid,
-  });
+  s.audit.push({ at: Date.now(), uid, action, mid });
 
   if (s.audit.length > 2000) {
     s.audit.splice(0, s.audit.length - 2000);
@@ -475,10 +413,7 @@ function validate(m) {
     'La publication doit avoir lieu avant la fermeture.'
   );
 
-  need(
-    /^\d{17,20}$/.test(m.channelId || ''),
-    'Salon invalide.'
-  );
+  need(/^\d{17,20}$/.test(m.channelId || ''), 'Salon invalide.');
 }
 
 function clearChoices(s, m) {
@@ -503,14 +438,7 @@ function clearChoices(s, m) {
 }
 
 function confirmPick(
-  s,
-  mid,
-  uid,
-  side,
-  boosted,
-  revision,
-  name,
-  now = Date.now()
+  s, mid, uid, side, boosted, revision, name, now = Date.now()
 ) {
   const m = match(s, mid);
 
@@ -526,13 +454,9 @@ function confirmPick(
     'Le match a été modifié. Reprends ton choix sur le message publié.'
   );
 
-  need(
-    ['home', 'away'].includes(side),
-    'Choix invalide.'
-  );
+  need(['home', 'away'].includes(side), 'Choix invalide.');
 
   s.boosts[m.date] ||= {};
-
   const old = s.boosts[m.date][uid];
 
   need(
@@ -541,13 +465,7 @@ function confirmPick(
   );
 
   s.votes[mid] ||= {};
-
-  s.votes[mid][uid] = {
-    side,
-    revision,
-    name,
-    at: now,
-  };
+  s.votes[mid][uid] = { side, revision, name, at: now };
 
   if (boosted) {
     s.boosts[m.date][uid] = mid;
@@ -570,9 +488,7 @@ function rankings(s, range) {
       continue;
     }
 
-    for (const [uid, v] of Object.entries(
-      s.votes[m.id] || {}
-    )) {
+    for (const [uid, v] of Object.entries(s.votes[m.id] || {})) {
       if (v.revision !== m.revision) continue;
 
       const r = users.get(uid) || {
@@ -589,10 +505,8 @@ function rankings(s, range) {
 
       if (m.result === v.side) {
         const boost = s.boosts[m.date]?.[uid] === m.id;
-
         r.points += boost ? 4 : 2;
         r.wins++;
-
         if (boost) r.boostedWins++;
       }
 
@@ -622,9 +536,7 @@ function rankings(s, range) {
 }
 
 function rangeOptions(options) {
-  const period =
-    options.getString('periode') || 'semaine';
-
+  const period = options.getString('periode') || 'semaine';
   const start = options.getString('debut');
   const end = options.getString('fin');
 
@@ -642,11 +554,7 @@ function rangeOptions(options) {
       'La date de début doit précéder la date de fin.'
     );
 
-    return {
-      start,
-      end,
-      label: `du ${start} au ${end}`,
-    };
+    return { start, end, label: `du ${start} au ${end}` };
   }
 
   if (period === 'general') {
@@ -672,13 +580,10 @@ function baseEmbed(title) {
 function media(m, e) {
   if (m.imageFile) {
     const name = `goat-${m.id}${path.extname(m.imageFile)}`;
-
     e.setImage(`attachment://${name}`);
 
     return {
-      files: [
-        new AttachmentBuilder(m.imageFile, { name }),
-      ],
+      files: [new AttachmentBuilder(m.imageFile, { name })],
     };
   }
 
@@ -692,30 +597,29 @@ function publicCard(m) {
     m.result === null &&
     Date.now() < m.closeAt;
 
-  const e = baseEmbed(m.title)
-    .setDescription([
-      m.description
-        ? safe(m.description)
-        : 'Qui va gagner ce match ?',
-      '',
-      `⚡ **${safe(m.home)}**  ·  *${fmtOdd(m.homeOdds)}*`,
-      '',
-      '**VS**',
-      '',
-      `🔥 **${safe(m.away)}**  ·  *${fmtOdd(m.awayOdds)}*`,
-      '',
-      'Choisis ton équipe, puis confirme ton pronostic.',
-      '',
-      '**2 points** si tu as juste. **4 points** avec le boost.',
-      'Un seul boost par journée. Une fois validé, ton choix est définitif.',
-      m.result === 'void'
-        ? '\nMatch annulé : aucun point.'
-        : ['home', 'away'].includes(m.result)
-          ? `\n✅ Victoire : **${safe(
-            m.result === 'home' ? m.home : m.away
-          )}**`
-          : '',
-    ].join('\n'));
+  const e = baseEmbed(m.title).setDescription([
+    m.description ? safe(m.description) : 'Qui va gagner ce match ?',
+    '',
+    `⚡ **${safe(m.home)}**  ·  *${fmtOdd(m.homeOdds)}*`,
+    '',
+    '**VS**',
+    '',
+    `🔥 **${safe(m.away)}**  ·  *${fmtOdd(m.awayOdds)}*`,
+    '',
+    'Choisis ton équipe, puis confirme ton pronostic.',
+    '',
+    `🕒 **Fin des mises :** ${formatTime(m.closeAt)} (heure de Paris)`,
+    '',
+    '**2 points** si tu as juste. **4 points** avec le boost.',
+    'Un seul boost par journée. Une fois validé, ton choix est définitif.',
+    m.result === 'void'
+      ? '\nMatch annulé : aucun point.'
+      : ['home', 'away'].includes(m.result)
+        ? `\n✅ Victoire : **${safe(
+          m.result === 'home' ? m.home : m.away
+        )}**`
+        : '',
+  ].join('\n'));
 
   return {
     embeds: [e],
@@ -748,31 +652,27 @@ function publicCard(m) {
 function pickPreview(s, m, uid) {
   const d = s.drafts[m.id]?.[uid];
 
-  need(
-    d,
-    'Reprends ton choix sur le message du match.'
-  );
+  need(d, 'Reprends ton choix sur le message du match.');
 
   const old = s.boosts[m.date]?.[uid];
   const boostUsed = Boolean(old && old !== m.id);
 
-  const e = baseEmbed('Confirme ton pronostic')
-    .setDescription([
-      `**${safe(m.home)} VS ${safe(m.away)}**`,
-      '',
-      `${d.side === 'home' ? '⚡' : '🔥'} Ton choix : **${safe(
-        d.side === 'home' ? m.home : m.away
-      )}**`,
-      '',
-      d.boost
-        ? '⚡ **Boost x2** : 4 points si tu as juste.'
-        : '🎯 **2 points** si tu as juste.',
-      '',
-      boostUsed
-        ? 'Ton boost de cette journée est déjà utilisé sur un autre match.\n'
-        : '',
-      '**Tu confirmes ?** Une fois validé, tu ne pourras plus modifier ton pronostic.',
-    ].join('\n'));
+  const e = baseEmbed('Confirme ton pronostic').setDescription([
+    `**${safe(m.home)} VS ${safe(m.away)}**`,
+    '',
+    `${d.side === 'home' ? '⚡' : '🔥'} Ton choix : **${safe(
+      d.side === 'home' ? m.home : m.away
+    )}**`,
+    '',
+    d.boost
+      ? '⚡ **Boost x2** : 4 points si tu as juste.'
+      : '🎯 **2 points** si tu as juste.',
+    '',
+    boostUsed
+      ? 'Ton boost de cette journée est déjà utilisé sur un autre match.\n'
+      : '',
+    '**Tu confirmes ?** Une fois validé, tu ne pourras plus modifier ton pronostic.',
+  ].join('\n'));
 
   return {
     content: '',
@@ -859,9 +759,7 @@ function staffCard(m) {
         : 'En attente';
 
   const e = baseEmbed(`📋 ${m.title}`)
-    .setDescription(
-      `**ID :** \`${m.id}\`\n**Statut :** ${status}`
-    )
+    .setDescription(`**ID :** \`${m.id}\`\n**Statut :** ${status}`)
     .addFields(
       {
         name: 'Match',
@@ -905,9 +803,7 @@ function staffCard(m) {
       },
       {
         name: 'Image',
-        value: m.image
-          ? `[Ouvrir l’image](${m.image})`
-          : 'Aucune',
+        value: m.image ? `[Ouvrir l’image](${m.image})` : 'Aucune',
       },
       {
         name: 'Texte',
@@ -916,9 +812,7 @@ function staffCard(m) {
           : 'Texte par défaut',
       }
     )
-    .setFooter({
-      text: `GOAT Betclic | Fiche ${m.id}`,
-    });
+    .setFooter({ text: `GOAT Betclic | Fiche ${m.id}` });
 
   if (m.post?.id && m.status !== 'deleted') {
     e.addFields({
@@ -940,10 +834,7 @@ function rankCard(s, range, page = 0) {
   const values = rankings(s, range);
   const pages = Math.max(1, Math.ceil(values.length / 15));
 
-  page = Math.max(
-    0,
-    Math.min(Number(page) || 0, pages - 1)
-  );
+  page = Math.max(0, Math.min(Number(page) || 0, pages - 1));
 
   const pending = Object.values(s.matches).filter(m =>
     m.status !== 'deleted' &&
@@ -952,12 +843,9 @@ function rankCard(s, range, page = 0) {
     m.result === null
   ).length;
 
-  const e = baseEmbed(
-    `🏆 GOAT Betclic | Classement ${range.label}`
-  )
+  const e = baseEmbed(`🏆 GOAT Betclic | Classement ${range.label}`)
     .setDescription(
-      values
-        .slice(page * 15, page * 15 + 15)
+      values.slice(page * 15, page * 15 + 15)
         .map(r =>
           `**${r.rank}.** <@${r.uid}> | **${r.points} pts** | ${r.wins} bons choix`
         )
@@ -976,9 +864,7 @@ function rankCard(s, range, page = 0) {
         value: 'Points, puis bons choix, puis boosts gagnants. Si tout est identique, les membres restent ex æquo.',
       }
     )
-    .setFooter({
-      text: `GOAT Betclic | Page ${page + 1}/${pages}`,
-    });
+    .setFooter({ text: `GOAT Betclic | Page ${page + 1}/${pages}` });
 
   return {
     content: '',
@@ -1005,21 +891,13 @@ function rankCard(s, range, page = 0) {
 
 function listCard(s, date, page = 0) {
   const values = Object.values(s.matches)
-    .filter(m =>
-      m.status !== 'deleted' &&
-      (!date || m.date === date)
-    )
+    .filter(m => m.status !== 'deleted' && (!date || m.date === date))
     .sort((a, b) =>
-      b.date.localeCompare(a.date) ||
-      a.publishAt - b.publishAt
+      b.date.localeCompare(a.date) || a.publishAt - b.publishAt
     );
 
   const pages = Math.max(1, Math.ceil(values.length / 8));
-
-  page = Math.max(
-    0,
-    Math.min(Number(page) || 0, pages - 1)
-  );
+  page = Math.max(0, Math.min(Number(page) || 0, pages - 1));
 
   const e = baseEmbed(
     date ? `📅 Matchs du ${date}` : '📅 GOAT Betclic | Matchs'
@@ -1033,9 +911,7 @@ function listCard(s, date, page = 0) {
       ).join('\n\n') ||
       'Aucun match. Utilise /goat create-match.'
     )
-    .setFooter({
-      text: `GOAT Betclic | Page ${page + 1}/${pages}`,
-    });
+    .setFooter({ text: `GOAT Betclic | Page ${page + 1}/${pages}` });
 
   return {
     embeds: [e],
@@ -1145,8 +1021,7 @@ function addMatchOptions(s, edit = false) {
 
   if (edit) {
     s.addBooleanOption(o =>
-      o.setName('retirer-image')
-        .setDescription('Retirer l’image')
+      o.setName('retirer-image').setDescription('Retirer l’image')
     )
       .addBooleanOption(o =>
         o.setName('retirer-notification')
@@ -1205,9 +1080,7 @@ const command = new SlashCommandBuilder()
     s.setName('delete-match')
       .setDescription('Supprimer un match avec confirmation')
       .addStringOption(o =>
-        o.setName('id')
-          .setDescription('ID du match')
-          .setRequired(true)
+        o.setName('id').setDescription('ID du match').setRequired(true)
       )
   )
   .addSubcommand(s =>
@@ -1225,9 +1098,7 @@ const command = new SlashCommandBuilder()
     s.setName('set-result')
       .setDescription('Saisir ou corriger un résultat')
       .addStringOption(o =>
-        o.setName('id')
-          .setDescription('ID du match')
-          .setRequired(true)
+        o.setName('id').setDescription('ID du match').setRequired(true)
       )
       .addStringOption(o =>
         o.setName('gagnant')
@@ -1244,44 +1115,32 @@ const command = new SlashCommandBuilder()
   .addSubcommand(s =>
     addRangeOptions(
       s.setName('leaderboard')
-        .setDescription(
-          'Afficher le classement uniquement sur demande'
-        )
+        .setDescription('Afficher le classement uniquement sur demande')
     )
   )
   .addSubcommand(s =>
     addRangeOptions(
       s.setName('export')
-        .setDescription(
-          'Exporter les points et les pronostics en CSV'
-        )
+        .setDescription('Exporter les points et les pronostics en CSV')
     )
   )
   .addSubcommand(s =>
-    s.setName('list')
-      .setDescription('Voir les matchs et leurs identifiants')
+    s.setName('list').setDescription('Voir les matchs et leurs identifiants')
   )
   .addSubcommand(s =>
     s.setName('day')
       .setDescription('Voir les matchs d’une journée')
       .addStringOption(o =>
-        o.setName('date')
-          .setDescription('AAAA-MM-JJ')
-          .setRequired(true)
+        o.setName('date').setDescription('AAAA-MM-JJ').setRequired(true)
       )
   )
   .addSubcommand(s =>
     s.setName('diagnostic')
-      .setDescription(
-        'Vérifier la sauvegarde et les programmations'
-      )
+      .setDescription('Vérifier la sauvegarde et les programmations')
   );
 
-// Les images Discord sont copiées sur le volume,
-// car les liens des pièces jointes peuvent expirer.
 async function cacheImage(m, directory) {
   m.imageFile = '';
-
   if (!m.image) return;
 
   const url = new URL(m.image);
@@ -1315,8 +1174,7 @@ async function cacheImage(m, directory) {
   need(ext, 'Utilise une image PNG, JPG, WEBP ou GIF.');
 
   need(
-    Number(response.headers.get('content-length') || 0) <=
-      8 * 1024 * 1024,
+    Number(response.headers.get('content-length') || 0) <= 8 * 1024 * 1024,
     'Image trop lourde : maximum 8 Mo.'
   );
 
@@ -1325,12 +1183,7 @@ async function cacheImage(m, directory) {
 
   for await (const chunk of response.body) {
     size += chunk.length;
-
-    need(
-      size <= 8 * 1024 * 1024,
-      'Image trop lourde : maximum 8 Mo.'
-    );
-
+    need(size <= 8 * 1024 * 1024, 'Image trop lourde : maximum 8 Mo.');
     chunks.push(chunk);
   }
 
@@ -1356,8 +1209,7 @@ async function run() {
   const staffId = env.STAFF_CHANNEL_ID?.trim();
 
   need(
-    env.DISCORD_TOKEN &&
-    /^\d{17,20}$/.test(guildId || ''),
+    env.DISCORD_TOKEN && /^\d{17,20}$/.test(guildId || ''),
     'Renseigne DISCORD_TOKEN et DISCORD_GUILD_ID.'
   );
 
@@ -1374,8 +1226,7 @@ async function run() {
   );
 
   need(
-    admins.size &&
-    [...admins].every(x => /^\d{17,20}$/.test(x)),
+    admins.size && [...admins].every(x => /^\d{17,20}$/.test(x)),
     'Renseigne ADMIN_USER_IDS avec vos IDs Discord.'
   );
 
@@ -1405,8 +1256,7 @@ async function run() {
 
   function admin(i) {
     need(
-      i.guildId === guildId &&
-      admins.has(i.user.id),
+      i.guildId === guildId && admins.has(i.user.id),
       'Cette action est réservée à l’équipe autorisée.'
     );
   }
@@ -1417,10 +1267,7 @@ async function run() {
     need(
       c &&
       c.guildId === guildId &&
-      [
-        ChannelType.GuildText,
-        ChannelType.GuildAnnouncement,
-      ].includes(c.type),
+      [ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(c.type),
       'Salon inaccessible.'
     );
 
@@ -1478,17 +1325,12 @@ async function run() {
       if (found) return found;
 
       const last = messages.last();
-
-      if (last.createdTimestamp < m.sendStartedAt - 10000) {
-        return null;
-      }
+      if (last.createdTimestamp < m.sendStartedAt - 10000) return null;
 
       before = last.id;
     }
 
-    throw new Error(
-      'Impossible de vérifier l’historique avant publication.'
-    );
+    throw new Error('Impossible de vérifier l’historique avant publication.');
   }
 
   async function syncStaff(m) {
@@ -1552,16 +1394,13 @@ async function run() {
         before = items.last().id;
 
         if (n === 99) {
-          throw new Error(
-            'Historique staff trop long pour vérifier l’envoi.'
-          );
+          throw new Error('Historique staff trop long pour vérifier l’envoi.');
         }
       }
     }
 
     const nonce = BigInt(
-      '0x' +
-      createHash('sha256')
+      '0x' + createHash('sha256')
         .update(`staff:${m.id}`)
         .digest('hex')
         .slice(0, 16)
@@ -1569,11 +1408,7 @@ async function run() {
 
     const message = previous
       ? await previous.edit(payload)
-      : await c.send({
-        ...payload,
-        nonce,
-        enforceNonce: true,
-      });
+      : await c.send({ ...payload, nonce, enforceNonce: true });
 
     await store.change(s => {
       s.matches[m.id].staffPost = {
@@ -1587,7 +1422,6 @@ async function run() {
 
   async function tick() {
     if (ticking || stopping || !client.isReady()) return;
-
     ticking = true;
 
     try {
@@ -1651,11 +1485,7 @@ async function run() {
               x.matches[m.id].sendStartedAt = null;
             });
 
-            target = {
-              ...m,
-              post: null,
-              sendStartedAt: null,
-            };
+            target = { ...m, post: null, sendStartedAt: null };
           }
 
           const c = await channel(m.channelId);
@@ -1676,14 +1506,12 @@ async function run() {
               target.sendStartedAt = Date.now();
 
               await store.change(x => {
-                x.matches[m.id].sendStartedAt =
-                  target.sendStartedAt;
+                x.matches[m.id].sendStartedAt = target.sendStartedAt;
               });
             }
 
             const nonce = BigInt(
-              '0x' +
-              createHash('sha256')
+              '0x' + createHash('sha256')
                 .update(`${m.id}:${target.sendStartedAt}`)
                 .digest('hex')
                 .slice(0, 16)
@@ -1717,9 +1545,7 @@ async function run() {
             latest.status = 'published';
             latest.lastOpen = active;
 
-            if (latest.version === m.version) {
-              latest.dirty = false;
-            }
+            if (latest.version === m.version) latest.dirty = false;
 
             return false;
           });
@@ -1736,7 +1562,7 @@ async function run() {
         }
       }
 
-      // Aucun classement n'est publié automatiquement.
+      // Aucun classement automatique.
     } catch (e) {
       log('Programmation', e);
     } finally {
@@ -1762,11 +1588,7 @@ async function run() {
       embeds: [],
       components: [
         row(
-          btn(
-            `admin-confirm:${token}`,
-            'Confirmer',
-            ButtonStyle.Danger
-          ),
+          btn(`admin-confirm:${token}`, 'Confirmer', ButtonStyle.Danger),
           btn(`admin-cancel:${token}`, 'Annuler')
         ),
       ],
@@ -1781,7 +1603,6 @@ async function run() {
     );
 
     const sub = i.options.getSubcommand();
-
     admin(i);
 
     await i.deferReply({ flags: privateFlag });
@@ -1861,7 +1682,6 @@ async function run() {
       if (!m.date) m.date = parisDate(m.publishAt);
       if (!m.title) m.title = `${m.home} VS ${m.away}`;
 
-      // Une fermeture passée ne peut pas être rouverte.
       if (
         before?.status === 'published' &&
         Date.now() >= before.closeAt
@@ -1936,7 +1756,6 @@ async function run() {
 
         m.dirty = true;
         s.matches[m.id] = m;
-
         audit(s, i.user.id, sub, m.id);
       });
 
@@ -2016,9 +1835,7 @@ async function run() {
     }
 
     if (sub === 'leaderboard') {
-      return i.editReply(
-        rankCard(s, rangeOptions(i.options))
-      );
+      return i.editReply(rankCard(s, rangeOptions(i.options)));
     }
 
     if (sub === 'list' || sub === 'day') {
@@ -2056,16 +1873,9 @@ async function run() {
           .replace(/^[=+\-@]/, "'$&")}"`;
 
       const rows = [[
-        'date',
-        'match_id',
-        'discord_id',
-        'pseudo',
-        'equipe_a',
-        'equipe_b',
-        'choix',
-        'boost',
-        'resultat',
-        'points',
+        'date', 'match_id', 'discord_id', 'pseudo',
+        'equipe_a', 'equipe_b', 'choix', 'boost',
+        'resultat', 'points',
       ]];
 
       for (const m of Object.values(s.matches)) {
@@ -2077,9 +1887,7 @@ async function run() {
           continue;
         }
 
-        for (const [uid, v] of Object.entries(
-          s.votes[m.id] || {}
-        )) {
+        for (const [uid, v] of Object.entries(s.votes[m.id] || {})) {
           if (v.revision !== m.revision) continue;
 
           const boost = s.boosts[m.date]?.[uid] === m.id;
@@ -2101,27 +1909,18 @@ async function run() {
 
       const standings = [
         [
-          'rang',
-          'discord_id',
-          'pseudo',
-          'points',
-          'bons_choix',
-          'boosts_gagnants',
+          'rang', 'discord_id', 'pseudo',
+          'points', 'bons_choix', 'boosts_gagnants',
         ],
         ...values.map(v => [
-          v.rank,
-          v.uid,
-          v.name,
-          v.points,
-          v.wins,
-          v.boostedWins,
+          v.rank, v.uid, v.name,
+          v.points, v.wins, v.boostedWins,
         ]),
       ];
 
       const file = (data, name) => new AttachmentBuilder(
         Buffer.from(
-          '\uFEFF' +
-          data.map(r => r.map(csv).join(';')).join('\r\n')
+          '\uFEFF' + data.map(r => r.map(csv).join(';')).join('\r\n')
         ),
         { name }
       );
@@ -2155,9 +1954,7 @@ async function run() {
         const p = s.pending[token];
 
         need(
-          p &&
-          p.uid === i.user.id &&
-          p.expires > Date.now(),
+          p && p.uid === i.user.id && p.expires > Date.now(),
           'Confirmation expirée. Recommence la commande.'
         );
 
@@ -2213,34 +2010,25 @@ async function run() {
 
       const [, start, end, page] = i.customId.split(':');
 
-      return i.editReply(
-        rankCard(
-          await store.read(),
-          start === 'all'
-            ? { label: 'général' }
-            : {
-              start,
-              end,
-              label: `du ${start} au ${end}`,
-            },
-          page
-        )
-      );
+      return i.editReply(rankCard(
+        await store.read(),
+        start === 'all'
+          ? { label: 'général' }
+          : { start, end, label: `du ${start} au ${end}` },
+        page
+      ));
     }
 
     if (action === 'list') {
       admin(i);
 
-      return i.editReply(
-        listCard(
-          await store.read(),
-          mid === 'all' ? null : mid,
-          side
-        )
-      );
+      return i.editReply(listCard(
+        await store.read(),
+        mid === 'all' ? null : mid,
+        side
+      ));
     }
 
-    // Compatibilité avec les anciens messages.
     if (['play', 'summary'].includes(action)) {
       const s = await store.read();
       const legacy = s.legacyDays?.[mid]?.[0];
@@ -2260,10 +2048,7 @@ async function run() {
 
     if (action === 'my') {
       const s = await store.read();
-
-      return i.editReply(
-        myChoice(s, match(s, mid), i.user.id)
-      );
+      return i.editReply(myChoice(s, match(s, mid), i.user.id));
     }
 
     if (['pick', 'boost', 'validate'].includes(action)) {
@@ -2302,7 +2087,6 @@ async function run() {
     if (action === 'pick' || action === 'boost') {
       const s = await store.change(x => {
         const m = match(x, mid);
-
         need(available(m), 'Ce match est fermé.');
 
         x.drafts[mid] ||= {};
@@ -2313,10 +2097,7 @@ async function run() {
             'Le match a changé. Utilise son message actualisé.'
           );
 
-          need(
-            ['home', 'away'].includes(side),
-            'Choix invalide.'
-          );
+          need(['home', 'away'].includes(side), 'Choix invalide.');
 
           x.drafts[mid][i.user.id] = {
             side,
@@ -2324,8 +2105,7 @@ async function run() {
             boost:
               x.drafts[mid][i.user.id]?.boost ??
               (x.boosts[m.date]?.[i.user.id] === mid),
-            version:
-              (x.drafts[mid][i.user.id]?.version || 0) + 1,
+            version: (x.drafts[mid][i.user.id]?.version || 0) + 1,
           };
         } else {
           const d = x.drafts[mid][i.user.id];
@@ -2345,9 +2125,7 @@ async function run() {
         return x;
       });
 
-      return i.editReply(
-        pickPreview(s, match(s, mid), i.user.id)
-      );
+      return i.editReply(pickPreview(s, match(s, mid), i.user.id));
     }
 
     if (action === 'validate') {
@@ -2376,10 +2154,7 @@ async function run() {
       });
 
       const s = await store.read();
-
-      return i.editReply(
-        myChoice(s, match(s, mid), i.user.id)
-      );
+      return i.editReply(myChoice(s, match(s, mid), i.user.id));
     }
   }
 
@@ -2387,10 +2162,7 @@ async function run() {
     if (stopping) return;
 
     try {
-      if (
-        i.isChatInputCommand() &&
-        i.commandName === 'goat'
-      ) {
+      if (i.isChatInputCommand() && i.commandName === 'goat') {
         await slash(i);
       } else if (
         i.isButton() &&
@@ -2400,9 +2172,7 @@ async function run() {
         await buttons(i);
       }
     } catch (e) {
-      if (!(e instanceof UserError)) {
-        log('Interaction', e);
-      }
+      if (!(e instanceof UserError)) log('Interaction', e);
 
       const payload = {
         content: e instanceof UserError
@@ -2429,7 +2199,6 @@ async function run() {
   client.once(Events.ClientReady, async () => {
     try {
       const guild = await client.guilds.fetch(guildId);
-
       await channel(staffId);
 
       const previous = await guild.commands.fetch();
@@ -2455,7 +2224,6 @@ async function run() {
       );
 
       await tick();
-
       timer = setInterval(() => void tick(), 15000);
     } catch (e) {
       log('Initialisation', e);
@@ -2471,7 +2239,6 @@ async function run() {
     client.destroy();
 
     await store.close().catch(() => {});
-
     process.exit(code);
   }
 
@@ -2496,9 +2263,7 @@ if (require.main === module) {
   run().catch(e => {
     console.error(
       `Démarrage : ${
-        e instanceof UserError
-          ? e.message
-          : e.code || e.name
+        e instanceof UserError ? e.message : e.code || e.name
       }`
     );
 
