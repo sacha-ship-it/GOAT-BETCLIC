@@ -21,12 +21,11 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const ZONE = 'Europe/Paris';
+const id = () => randomUUID().replaceAll('-', '').slice(0, 16);
 
 const RED = /^#[a-f\d]{6}$/i.test(process.env.GOAT_COLOR || '')
   ? process.env.GOAT_COLOR
   : '#E31B23';
-
-const id = () => randomUUID().replaceAll('-', '').slice(0, 16);
 
 class UserError extends Error {}
 
@@ -124,7 +123,7 @@ function parseTime(value) {
   let text = value.trim();
 
   // Format conseillé : 07:00 2026-10-20.
-  // Le format 2026-10-20 07:00 reste accepté.
+  // Le format 2026-10-20 07:00 est également accepté.
   if (/^\d{2}:\d{2} \d{4}-\d{2}-\d{2}$/.test(text)) {
     text = text.slice(6) + ' ' + text.slice(0, 5);
   }
@@ -150,7 +149,10 @@ function parseTime(value) {
 
   for (let offset = -180; offset <= 180; offset += 30) {
     const ms = utc + offset * 60000;
-    if (parisInput(ms) === text) candidates.push(ms);
+
+    if (parisInput(ms) === text) {
+      candidates.push(ms);
+    }
   }
 
   need(
@@ -186,6 +188,7 @@ function imageURL(value) {
   );
 
   need(url.length <= 1000, 'Lien image trop long.');
+
   return url;
 }
 
@@ -226,7 +229,6 @@ function initialState() {
   };
 }
 
-// Préserve les données de la première version.
 function migrate(old) {
   if (
     old.schema === 2 &&
@@ -320,7 +322,7 @@ class Store {
 
       this.state = migrate(data);
     } catch (e) {
-      // Ne pas remplacer une sauvegarde illisible.
+      // Ne jamais écraser une sauvegarde illisible.
       if (e.code !== 'ENOENT') throw e;
 
       this.state = initialState();
@@ -355,7 +357,9 @@ class Store {
     try {
       await directory.sync();
     } catch (e) {
-      if (!['EINVAL', 'ENOTSUP'].includes(e.code)) throw e;
+      if (!['EINVAL', 'ENOTSUP'].includes(e.code)) {
+        throw e;
+      }
     } finally {
       await directory.close();
     }
@@ -417,6 +421,7 @@ function createStore(env = process.env) {
 function available(m, now = Date.now()) {
   return (
     m.status === 'published' &&
+    !m.closedAt &&
     m.result === null &&
     now < m.closeAt
   );
@@ -678,12 +683,12 @@ function media(m, e) {
   }
 
   if (m.image) e.setImage(m.image);
-
   return {};
 }
 
 function publicCard(m) {
   const active =
+    !m.closedAt &&
     m.result === null &&
     Date.now() < m.closeAt;
 
@@ -693,11 +698,11 @@ function publicCard(m) {
         ? safe(m.description)
         : 'Qui va gagner ce match ?',
       '',
-      `🟢 **${safe(m.home)}**  ·  **${fmtOdd(m.homeOdds)}**`,
+      `⚡ **${safe(m.home)}**  ·  *${fmtOdd(m.homeOdds)}*`,
       '',
       '**VS**',
       '',
-      `🔴 **${safe(m.away)}**  ·  **${fmtOdd(m.awayOdds)}**`,
+      `🔥 **${safe(m.away)}**  ·  *${fmtOdd(m.awayOdds)}*`,
       '',
       'Choisis ton équipe, puis confirme ton pronostic.',
       '',
@@ -719,13 +724,13 @@ function publicCard(m) {
       row(
         btn(
           `pick:${m.id}:home:${m.revision}`,
-          `🟢 ${m.home}`,
+          `⚡ ${m.home}`,
           ButtonStyle.Success,
           !active
         ),
         btn(
           `pick:${m.id}:away:${m.revision}`,
-          `🔴 ${m.away}`,
+          `🔥 ${m.away}`,
           ButtonStyle.Danger,
           !active
         ),
@@ -755,7 +760,7 @@ function pickPreview(s, m, uid) {
     .setDescription([
       `**${safe(m.home)} VS ${safe(m.away)}**`,
       '',
-      `${d.side === 'home' ? '🟢' : '🔴'} Ton choix : **${safe(
+      `${d.side === 'home' ? '⚡' : '🔥'} Ton choix : **${safe(
         d.side === 'home' ? m.home : m.away
       )}**`,
       '',
@@ -814,7 +819,7 @@ function myChoice(s, m, uid) {
     .setDescription([
       `**${safe(m.home)} VS ${safe(m.away)}**`,
       '',
-      `${v.side === 'home' ? '🟢' : '🔴'} Ton choix : **${safe(
+      `${v.side === 'home' ? '⚡' : '🔥'} Ton choix : **${safe(
         v.side === 'home' ? m.home : m.away
       )}**`,
       '',
@@ -841,6 +846,10 @@ function staffCard(m) {
     draft: 'Brouillon',
   };
 
+  const status = m.closedAt && m.status !== 'deleted'
+    ? 'Participations fermées manuellement'
+    : labels[m.status] || m.status;
+
   const result = m.result === 'void'
     ? 'Annulé'
     : m.result === 'home'
@@ -851,8 +860,7 @@ function staffCard(m) {
 
   const e = baseEmbed(`📋 ${m.title}`)
     .setDescription(
-      `**ID :** \`${m.id}\`\n` +
-      `**Statut :** ${labels[m.status] || m.status}`
+      `**ID :** \`${m.id}\`\n**Statut :** ${status}`
     )
     .addFields(
       {
@@ -862,8 +870,8 @@ function staffCard(m) {
       {
         name: 'Cotes',
         value:
-          `${safe(m.home)} : **${fmtOdd(m.homeOdds)}**\n` +
-          `${safe(m.away)} : **${fmtOdd(m.awayOdds)}**`,
+          `${safe(m.home)} : *${fmtOdd(m.homeOdds)}*\n` +
+          `${safe(m.away)} : *${fmtOdd(m.awayOdds)}*`,
       },
       {
         name: 'Publication - Paris',
@@ -1203,6 +1211,17 @@ const command = new SlashCommandBuilder()
       )
   )
   .addSubcommand(s =>
+    s.setName('close-match')
+      .setDescription(
+        'Fermer immédiatement les participations, sans supprimer les choix'
+      )
+      .addStringOption(o =>
+        o.setName('id')
+          .setDescription('ID du match dans la fiche staff')
+          .setRequired(true)
+      )
+  )
+  .addSubcommand(s =>
     s.setName('set-result')
       .setDescription('Saisir ou corriger un résultat')
       .addStringOption(o =>
@@ -1258,7 +1277,8 @@ const command = new SlashCommandBuilder()
       )
   );
 
-// Conservation des images Discord sur le volume.
+// Les images Discord sont copiées sur le volume,
+// car les liens des pièces jointes peuvent expirer.
 async function cacheImage(m, directory) {
   m.imageFile = '';
 
@@ -1362,7 +1382,6 @@ async function run() {
   const store = createStore(env);
   await store.init();
 
-  // Actualiser les anciens messages avec les nouveaux boutons.
   await store.change(s => {
     for (const m of Object.values(s.matches)) {
       if (m.status === 'published') m.dirty = true;
@@ -1568,6 +1587,7 @@ async function run() {
 
   async function tick() {
     if (ticking || stopping || !client.isReady()) return;
+
     ticking = true;
 
     try {
@@ -1603,6 +1623,7 @@ async function run() {
         }
 
         const active =
+          !m.closedAt &&
           m.result === null &&
           Date.now() < m.closeAt;
 
@@ -1715,7 +1736,7 @@ async function run() {
         }
       }
 
-      // Aucun classement automatique.
+      // Aucun classement n'est publié automatiquement.
     } catch (e) {
       log('Programmation', e);
     } finally {
@@ -1760,6 +1781,7 @@ async function run() {
     );
 
     const sub = i.options.getSubcommand();
+
     admin(i);
 
     await i.deferReply({ flags: privateFlag });
@@ -1839,6 +1861,7 @@ async function run() {
       if (!m.date) m.date = parisDate(m.publishAt);
       if (!m.title) m.title = `${m.home} VS ${m.away}`;
 
+      // Une fermeture passée ne peut pas être rouverte.
       if (
         before?.status === 'published' &&
         Date.now() >= before.closeAt
@@ -1939,6 +1962,31 @@ async function run() {
       });
     }
 
+    if (sub === 'close-match') {
+      const mid = i.options.getString('id');
+
+      await store.change(x => {
+        const m = match(x, mid);
+
+        need(
+          !m.closedAt,
+          'Les participations sont déjà fermées manuellement.'
+        );
+
+        m.closedAt = Date.now();
+        m.dirty = true;
+        m.version++;
+
+        audit(x, i.user.id, 'close-match', mid);
+      });
+
+      void tick();
+
+      return i.editReply(
+        '🔒 Participations fermées immédiatement. Les pronostics validés et les points sont conservés. La fiche staff sera actualisée.'
+      );
+    }
+
     if (sub === 'set-result') {
       const mid = i.options.getString('id');
       const result = i.options.getString('gagnant');
@@ -1991,7 +2039,7 @@ async function run() {
         `📅 ${all.filter(m => m.status === 'scheduled').length} matchs programmés`,
         `📣 ${all.filter(m => m.status === 'published').length} matchs publiés`,
         `⏳ ${all.filter(m => m.result === null && m.closeAt < Date.now()).length} résultats à saisir`,
-        '🏆 Classements réservés au staff, uniquement sur commande',
+        '🏆 Classements réservés au staff, sur commande',
         '🔒 Pronostics définitifs après validation',
         '🕰 Heure de Paris',
         `📦 ${s.archives.length} archives`,
@@ -2192,7 +2240,7 @@ async function run() {
       );
     }
 
-    // Compatibilité avec les boutons de la première version.
+    // Compatibilité avec les anciens messages.
     if (['play', 'summary'].includes(action)) {
       const s = await store.read();
       const legacy = s.legacyDays?.[mid]?.[0];
@@ -2218,12 +2266,21 @@ async function run() {
       );
     }
 
-    // Un choix enregistré ne peut pas être modifié,
-    // même en utilisant les boutons d'un ancien message.
     if (['pick', 'boost', 'validate'].includes(action)) {
       const current = await store.read();
 
       if (current.votes[mid]?.[i.user.id]) {
+        if (action === 'pick') {
+          return i.editReply({
+            content:
+              'Tu as déjà participé à ce match.\n\n' +
+              'Pour retrouver ton pronostic, appuie sur **Mon choix**.',
+            embeds: [],
+            components: [],
+            allowedMentions: quiet,
+          });
+        }
+
         return i.editReply(
           myChoice(current, match(current, mid), i.user.id)
         );
